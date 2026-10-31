@@ -27,3 +27,6 @@
 ## Game states (FSM)
 `PLAYING` → (piece locks with full rows) → `CLEARING` (rows flash 450 ms) → `PLAYING`
 `PLAYING`/`CLEARING` → (new piece doesn't fit) → `GAME_OVER` → (any button after 1 s) → `PLAYING`
+
+## Circuit
+https://app.cirkitdesigner.com/project/9eb23c06-6c46-4f0a-8e20-9ddbd20e1ab2
