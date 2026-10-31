@@ -8,11 +8,12 @@
 // 115200 baud: a = left, d = right, w = rotate, s = down,
 // x = hard drop
 //
-// The game logic lives in TetrisGame.h
+// The game logic lives in TetrisGame.h; versus networking lives in VersusGame.h.
 // This file only handles the hardware: buttons, Serial and the LED matrix.
 
 #include "Arduino_LED_Matrix.h"
 #include "TetrisGame.h"
+#include "VersusGame.h"
 
 #define FLIP_180 0
 
@@ -89,6 +90,44 @@ uint8_t frame[8][12];                 // the matrix's native layout: 8 rows x 12
 uint8_t shown[tetris::H];             // last thing we drew, to skip redundant redraws
 bool firstDraw = true;
 
+enum Mode : uint8_t { MODE_SINGLE, MODE_VERSUS };
+Mode selectedMode = MODE_SINGLE;
+bool versusMenu = true;
+bool menuChoiceVersus = false;
+uint16_t reportedLines = 0;
+tetris::Game game;
+tetris::VersusGame versus;
+long gameRandom(long n);
+void drawRows(const uint8_t rows[tetris::H]);
+
+void drawMenu() {
+  uint8_t rows[tetris::H] = {0};
+
+  const uint8_t digit[5] = {
+    menuChoiceVersus ? 7 : 2,
+    menuChoiceVersus ? 4 : 3,
+    menuChoiceVersus ? 2 : 2,
+    menuChoiceVersus ? 1 : 2,
+    7
+  };
+  const uint8_t p[5] = {3, 5, 3, 1, 1};
+
+  // Show only one centered choice: 1P initially, then 2P after left/right.
+  for (uint8_t r = 0; r < 5; r++) {
+    rows[4 + r] |= (uint8_t)(digit[r] << 1);
+    rows[4 + r] |= (uint8_t)(p[r] << 5);
+  }
+  drawRows(rows);
+}
+
+void showVersusConnection() {
+  uint8_t rows[tetris::H] = {0};
+  rows[4] = 0x18;
+  rows[5] = 0x18;
+  rows[6] = 0x18;
+  drawRows(rows);
+}
+
 void drawRows(const uint8_t rows[tetris::H]) {
   // board (row r, col c), r = 0 at the top, maps to matrix (c, 11 - r):
   // the top of the game is the matrix's right edge.
@@ -106,7 +145,6 @@ void drawRows(const uint8_t rows[tetris::H]) {
 }
 
 // ---------- game ----------
-tetris::Game game;
 long gameRandom(long n) { return random(n); }
 
 tetris::State lastState;
@@ -121,13 +159,46 @@ void setup() {
 
   game.begin(millis(), gameRandom);
   lastState = game.state();
-  Serial.println(F("Tetris! a/d move, w rotate, s down, x drop"));
+  Serial.println(F("Tetris! left/right select mode, rotate confirms."));
+  drawMenu();
 }
 
 void loop() {
   uint32_t now = millis();
   uint8_t actions = pollButtons(now) | pollSerial();
+
+  if (versusMenu) {
+    if (actions & (tetris::A_LEFT | tetris::A_RIGHT)) {
+      menuChoiceVersus = !menuChoiceVersus;
+      drawMenu();
+    }
+    if (actions & tetris::A_ROTATE) {
+      selectedMode = menuChoiceVersus ? MODE_VERSUS : MODE_SINGLE;
+      if (selectedMode == MODE_VERSUS) {
+        versusMenu = false;
+        versus.begin(now, gameRandom);
+        showVersusConnection();
+        Serial.println(F("Searching for another Tetris board..."));
+      } else {
+        versusMenu = false;
+        game.begin(now, gameRandom);
+      }
+    }
+    return;
+  }
+
+  if (selectedMode == MODE_VERSUS) versus.update(now, game);
+  if (selectedMode == MODE_VERSUS && versus.state() == tetris::VersusGame::CONNECTING) {
+    showVersusConnection();
+    return;
+  }
+  if (selectedMode == MODE_VERSUS && versus.state() == tetris::VersusGame::FINISHED) return;
+
   game.update(now, actions);
+  if (selectedMode == MODE_VERSUS && game.lines() > reportedLines) {
+    versus.sendGarbage(game.lines() - reportedLines);
+    reportedLines = game.lines();
+  }
 
   uint8_t rows[tetris::H];
   game.render(now, rows);
@@ -141,7 +212,12 @@ void loop() {
     if (lastState == tetris::GAME_OVER) {
       Serial.print(F("Game over! Score: ")); Serial.print(game.score());
       Serial.print(F("  Lines: "));         Serial.println(game.lines());
-      Serial.println(F("Press any button to play again."));
+      if (selectedMode == MODE_VERSUS) {
+        versus.sendLoss();
+        Serial.println(F("You lose. Reset the board to play again."));
+      } else {
+        Serial.println(F("Press any button to play again."));
+      }
     } else if (lastState == tetris::CLEARING) {
       Serial.print(F("Lines: ")); Serial.print(game.lines());
       Serial.print(F("  Score: ")); Serial.println(game.score());

@@ -126,6 +126,20 @@ public:
   uint16_t lines() const { return lines_; }
   uint8_t level() const { return lines_ / 4; }
 
+  // Add opponent garbage at the bottom. Each row has one empty cell.
+  void addGarbage(uint8_t count, uint32_t now) {
+    if (state_ == GAME_OVER) return;
+    while (count--) {
+      for (int8_t r = 0; r < H - 1; r++) board_[r] = board_[r + 1];
+      uint8_t hole = rnd_ ? (uint8_t)rnd_(W) : 0;
+      board_[H - 1] = (uint8_t)(FULL_ROW & ~(1u << hole));
+      if (!fits(piece_)) {
+        setState(GAME_OVER, now);
+        return;
+      }
+    }
+  }
+
   // Gravity: starts at 800 ms per row, speeds up
   // every 4 lines, never faster than 120 ms.
   uint32_t fallInterval() const {

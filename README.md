@@ -24,6 +24,17 @@
 **No buttons yet?** Open the Serial Monitor at 115200 baud and type
 `a` left, `d` right, `w` rotate, `s` down, `x` hard drop, then press Enter.
 
+## Versus mode
+
+After reset, use Left/Right to choose single-player or versus mode, then press
+Rotate to confirm. In versus mode, both UNO R4 WiFi boards connect to the same phone hotspot.
+Set `WIFI_SSID` and `WIFI_PASSWORD` in `VersusGame.h` to your hotspot
+credentials. The boards discover each other with UDP broadcast on port 4210;
+neither board creates a WiFi access point. Keep client/AP isolation disabled
+on the phone hotspot. Clearing lines sends one garbage row per cleared line to
+the opponent. A versus game ends when one board reaches the top; reset either
+board to return to the mode menu.
+
 ## Game states (FSM)
 `PLAYING` → (piece locks with full rows) → `CLEARING` (rows flash 450 ms) → `PLAYING`
 `PLAYING`/`CLEARING` → (new piece doesn't fit) → `GAME_OVER` → (any button after 1 s) → `PLAYING`
