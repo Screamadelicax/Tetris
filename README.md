@@ -39,5 +39,10 @@ board to return to the mode menu.
 `PLAYING` → (piece locks with full rows) → `CLEARING` (rows flash 450 ms) → `PLAYING`
 `PLAYING`/`CLEARING` → (new piece doesn't fit) → `GAME_OVER` → (any button after 1 s) → `PLAYING`
 
+See the detailed main-control FSM, including its inputs, outputs, state
+variables, initialization, and numbered states, in
+[state-machine.md](./state-machine.md). It covers mode selection, versus
+connection, garbage rows, and network win/loss events.
+
 ## Circuit
 https://app.cirkitdesigner.com/project/9eb23c06-6c46-4f0a-8e20-9ddbd20e1ab2
