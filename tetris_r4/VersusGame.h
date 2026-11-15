@@ -47,10 +47,15 @@ public:
             strcmp(buffer + 1, deviceId_.c_str()) != 0) {
           opponentIp_ = udp_.remoteIP();
           wifiReady_ = true;
-          state_ = PLAYING;
-          game.begin(now, rnd_);
-          Serial.print(F("Opponent found at "));
-          Serial.println(opponentIp_);
+          sendPacket("A");
+          startPlaying(now, game);
+          return;
+        }
+        if (buffer[0] == 'A' &&
+            udp_.remoteIP() != WiFi.localIP()) {
+          opponentIp_ = udp_.remoteIP();
+          wifiReady_ = true;
+          startPlaying(now, game);
           return;
         }
         packet = udp_.parsePacket();
@@ -95,6 +100,14 @@ private:
   static const uint32_t WIFI_RETRY_MS = 5000;
   static const uint8_t PACKET_SIZE = 32;
 
+  void startPlaying(uint32_t now, Game &game) {
+    if (state_ == PLAYING) return;
+    state_ = PLAYING;
+    game.begin(now, rnd_);
+    Serial.print(F("Opponent found at "));
+    Serial.println(opponentIp_);
+  }
+
   String macAddressString() const {
     uint8_t mac[6];
     WiFi.macAddress(mac);
@@ -131,7 +144,7 @@ private:
   uint32_t lastDiscovery_ = 0;
 };
 
-const char VersusGame::WIFI_SSID[] = "TETRIS-VS";       // TODO: Use the actual wifi SSID
-const char VersusGame::WIFI_PASSWORD[] = "tetris-vs";   // TODO: Use the actual wifi password
+const char VersusGame::WIFI_SSID[] = "ztriphone";       // TODO: Use the actual wifi SSID
+const char VersusGame::WIFI_PASSWORD[] = "ztr12345";   // TODO: Use the actual wifi password
 
 }  // namespace tetris

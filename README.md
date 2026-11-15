@@ -34,6 +34,8 @@ neither board creates a WiFi access point. Keep client/AP isolation disabled
 on the phone hotspot. Clearing lines sends one garbage row per cleared line to
 the opponent. A versus game ends when one board reaches the top; reset either
 board to return to the mode menu.
+The winner's matrix displays a large `W`, and the loser's matrix displays a
+large `L`.
 
 ## Game states (FSM)
 `PLAYING` → (piece locks with full rows) → `CLEARING` (rows flash 450 ms) → `PLAYING`

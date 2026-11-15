@@ -95,6 +95,7 @@ Mode selectedMode = MODE_SINGLE;
 bool versusMenu = true;
 bool menuChoiceVersus = false;
 uint16_t reportedLines = 0;
+bool versusResultShown = false;
 tetris::Game game;
 tetris::VersusGame versus;
 long gameRandom(long n);
@@ -125,6 +126,27 @@ void showVersusConnection() {
   rows[4] = 0x18;
   rows[5] = 0x18;
   rows[6] = 0x18;
+  drawRows(rows);
+}
+
+void showVersusResult(bool won) {
+  uint8_t rows[tetris::H] = {0};
+
+  // These are 5x5 glyphs in board coordinates. Keeping the glyphs in the
+  // board's orientation makes their direction match the falling pieces.
+  if (won) {
+    rows[4] = 0x22;
+    rows[5] = 0x22;
+    rows[6] = 0x2A;
+    rows[7] = 0x2A;
+    rows[8] = 0x14;
+  } else {
+    rows[4] = 0x02;
+    rows[5] = 0x02;
+    rows[6] = 0x02;
+    rows[7] = 0x02;
+    rows[8] = 0x3E;
+  }
   drawRows(rows);
 }
 
@@ -176,6 +198,8 @@ void loop() {
       selectedMode = menuChoiceVersus ? MODE_VERSUS : MODE_SINGLE;
       if (selectedMode == MODE_VERSUS) {
         versusMenu = false;
+        reportedLines = 0;
+        versusResultShown = false;
         versus.begin(now, gameRandom);
         showVersusConnection();
         Serial.println(F("Searching for another Tetris board..."));
@@ -192,7 +216,14 @@ void loop() {
     showVersusConnection();
     return;
   }
-  if (selectedMode == MODE_VERSUS && versus.state() == tetris::VersusGame::FINISHED) return;
+  if (selectedMode == MODE_VERSUS &&
+      versus.state() == tetris::VersusGame::FINISHED) {
+    if (!versusResultShown) {
+      showVersusResult(versus.opponentWon());
+      versusResultShown = true;
+    }
+    return;
+  }
 
   game.update(now, actions);
   if (selectedMode == MODE_VERSUS && game.lines() > reportedLines) {
@@ -222,5 +253,12 @@ void loop() {
       Serial.print(F("Lines: ")); Serial.print(game.lines());
       Serial.print(F("  Score: ")); Serial.println(game.score());
     }
+  }
+
+  if (selectedMode == MODE_VERSUS &&
+      versus.state() == tetris::VersusGame::FINISHED &&
+      !versusResultShown) {
+    showVersusResult(versus.opponentWon());
+    versusResultShown = true;
   }
 }
