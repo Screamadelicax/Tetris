@@ -27,6 +27,7 @@ const uint8_t PIN_DROP   = 6;
 const uint32_t DEBOUNCE_MS   = 15;
 const uint32_t REPEAT_DELAY  = 170;  // hold this long before auto-repeat...
 const uint32_t REPEAT_EVERY  = 60;   // ...then repeat this often
+const uint32_t VERSUS_LOADING_MS = 1200;
 
 struct Button {
   uint8_t pin;
@@ -96,6 +97,8 @@ bool versusMenu = true;
 bool menuChoiceVersus = false;
 uint16_t reportedLines = 0;
 bool versusResultShown = false;
+uint8_t connectionFrame = 255;
+uint32_t versusLoadingUntil = 0;
 tetris::Game game;
 tetris::VersusGame versus;
 long gameRandom(long n);
@@ -121,11 +124,18 @@ void drawMenu() {
   drawRows(rows);
 }
 
-void showVersusConnection() {
+void showVersusConnection(uint32_t now) {
+  uint8_t frameIndex = (now / 300) % 4;
+  if (frameIndex == connectionFrame) return;
+  connectionFrame = frameIndex;
+
   uint8_t rows[tetris::H] = {0};
-  rows[4] = 0x18;
-  rows[5] = 0x18;
-  rows[6] = 0x18;
+
+  // Repeat: one dot, two dots, three dots, then an empty frame.
+  uint8_t dotCount = frameIndex;
+  if (dotCount >= 1) rows[6] |= 0x02;
+  if (dotCount >= 2) rows[6] |= 0x08;
+  if (dotCount >= 3) rows[6] |= 0x20;
   drawRows(rows);
 }
 
@@ -141,11 +151,11 @@ void showVersusResult(bool won) {
     rows[7] = 0x2A;
     rows[8] = 0x14;
   } else {
-    rows[4] = 0x02;
-    rows[5] = 0x02;
-    rows[6] = 0x02;
-    rows[7] = 0x02;
-    rows[8] = 0x3E;
+    rows[4] = 0x04;
+    rows[5] = 0x04;
+    rows[6] = 0x04;
+    rows[7] = 0x04;
+    rows[8] = 0x1C;
   }
   drawRows(rows);
 }
@@ -200,8 +210,11 @@ void loop() {
         versusMenu = false;
         reportedLines = 0;
         versusResultShown = false;
+        connectionFrame = 255;
         versus.begin(now, gameRandom);
-        showVersusConnection();
+        uint32_t loadingStart = millis();
+        versusLoadingUntil = loadingStart + VERSUS_LOADING_MS;
+        showVersusConnection(loadingStart);
         Serial.println(F("Searching for another Tetris board..."));
       } else {
         versusMenu = false;
@@ -212,16 +225,20 @@ void loop() {
   }
 
   if (selectedMode == MODE_VERSUS) versus.update(now, game);
-  if (selectedMode == MODE_VERSUS && versus.state() == tetris::VersusGame::CONNECTING) {
-    showVersusConnection();
-    return;
-  }
   if (selectedMode == MODE_VERSUS &&
       versus.state() == tetris::VersusGame::FINISHED) {
     if (!versusResultShown) {
       showVersusResult(versus.opponentWon());
       versusResultShown = true;
     }
+    return;
+  }
+  if (selectedMode == MODE_VERSUS && now < versusLoadingUntil) {
+    showVersusConnection(now);
+    return;
+  }
+  if (selectedMode == MODE_VERSUS && versus.state() == tetris::VersusGame::CONNECTING) {
+    showVersusConnection(now);
     return;
   }
 
